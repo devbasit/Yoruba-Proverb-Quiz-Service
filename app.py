@@ -192,6 +192,11 @@ def check_answer_endpoint():
         'correct_answer': result['correct_answer']
     })
 
+from flask import Response
+import csv
+from io import StringIO
+from datetime import datetime
+
 @app.route('/submit_quiz', methods=['POST'])
 def submit_quiz():
     data = request.json
@@ -234,25 +239,45 @@ def submit_quiz():
     percentage = (score / num_questions * 100) if num_questions > 0 else 0
     grade = get_grade(percentage)
     
-    # Ensure the file is saved in the root directory
+    # Generate CSV content in memory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"quiz_results_{user_name}_{timestamp}.csv"
-    with open(filename, 'w', encoding='utf-8', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['Question ID', 'Type', 'Correct', 'Selected Answer', 'Correct Answer', 'Feedback'])
-        for result in results:
-            writer.writerow([
-                result['question_id'],
-                result['type'],
-                result['correct'],
-                result['selected'],
-                result['correct_answer'],
-                result['message']
-            ])
-        writer.writerow(['', '', '', '', 'Final Score', f'{score}/{num_questions} ({percentage:.1f}%)'])
-        writer.writerow(['', '', '', '', 'Grade', grade])
+    csv_buffer = StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(['Question ID', 'Type', 'Correct', 'Selected Answer', 'Correct Answer', 'Feedback'])
+    for result in results:
+        writer.writerow([
+            result['question_id'],
+            result['type'],
+            result['correct'],
+            result['selected'],
+            result['correct_answer'],
+            result['message']
+        ])
+    writer.writerow(['', '', '', '', 'Final Score', f'{score}/{num_questions} ({percentage:.1f}%)'])
+    writer.writerow(['', '', '', '', 'Grade', grade])
+    
+    csv_content = csv_buffer.getvalue()
+    csv_buffer.close()
     
     del quiz_storage[quiz_id]
+    
+    return jsonify({
+        'score': score,
+        'total': num_questions,
+        'percentage': percentage,
+        'grade': grade,
+        'breakdown': {
+            qtype: {
+                'correct': stats['correct'],
+                'total': stats['total'],
+                'percentage': (stats['correct'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            } for qtype, stats in type_counts.items() if stats['total'] > 0
+        },
+        'results': results,
+        'results_file': filename,
+        'csv_content': csv_content  # Add CSV content to the response
+    })
     
     return jsonify({
         'score': score,

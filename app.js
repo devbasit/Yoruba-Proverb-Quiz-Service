@@ -110,31 +110,47 @@ function App() {
     setLoading(false);
   };
 
-  const handleSubmitQuiz = async (answersToSubmit) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/submit_quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quiz_id: quiz.quiz_id,
-          answers: answersToSubmit.map(a => ({ question_id: a.question_id, choice: a.choice })),
-          user_name: userName
-        })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setResults(data);
-        setView('results');
-      } else {
-        setError(data.error || 'Failed to submit quiz');
-      }
-    } catch (err) {
-      setError('Error connecting to the server');
+const handleSubmitQuiz = async (answersToSubmit) => {
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await fetch('/submit_quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        quiz_id: quiz.quiz_id,
+        answers: answersToSubmit.map(a => ({ question_id: a.question_id, choice: a.choice })),
+        user_name: userName
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to submit quiz');
     }
+
+    const data = await response.json();
+    setResults(data);
+    setView('results');
+
+    // Create a downloadable file from csv_content
+    const csvContent = data.csv_content;
+    const filename = data.results_file;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setError(err.message);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   const resetQuiz = () => {
     setQuiz(null);

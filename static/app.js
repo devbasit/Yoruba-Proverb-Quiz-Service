@@ -255,7 +255,7 @@ function App() {
   }();
   var handleSubmitQuiz = /*#__PURE__*/function () {
     var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee4(answersToSubmit) {
-      var response, data;
+      var response, errorData, data, csvContent, filename, blob, url, link;
       return _regeneratorRuntime().wrap(function _callee4$(_context4) {
         while (1) switch (_context4.prev = _context4.next) {
           case 0:
@@ -281,29 +281,52 @@ function App() {
             });
           case 5:
             response = _context4.sent;
-            _context4.next = 8;
-            return response.json();
-          case 8:
-            data = _context4.sent;
             if (response.ok) {
-              setResults(data);
-              setView('results');
-            } else {
-              setError(data.error || 'Failed to submit quiz');
+              _context4.next = 11;
+              break;
             }
-            _context4.next = 15;
+            _context4.next = 9;
+            return response.json();
+          case 9:
+            errorData = _context4.sent;
+            throw new Error(errorData.error || 'Failed to submit quiz');
+          case 11:
+            _context4.next = 13;
+            return response.json();
+          case 13:
+            data = _context4.sent;
+            setResults(data);
+            setView('results');
+
+            // Create a downloadable file from csv_content
+            csvContent = data.csv_content;
+            filename = data.results_file;
+            blob = new Blob([csvContent], {
+              type: 'text/csv;charset=utf-8;'
+            });
+            url = URL.createObjectURL(blob);
+            link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            _context4.next = 32;
             break;
-          case 12:
-            _context4.prev = 12;
+          case 29:
+            _context4.prev = 29;
             _context4.t0 = _context4["catch"](2);
-            setError('Error connecting to the server');
-          case 15:
+            setError(_context4.t0.message);
+          case 32:
+            _context4.prev = 32;
             setLoading(false);
-          case 16:
+            return _context4.finish(32);
+          case 35:
           case "end":
             return _context4.stop();
         }
-      }, _callee4, null, [[2, 12]]);
+      }, _callee4, null, [[2, 29, 32, 35]]);
     }));
     return function handleSubmitQuiz(_x2) {
       return _ref4.apply(this, arguments);
