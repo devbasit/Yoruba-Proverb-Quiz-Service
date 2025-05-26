@@ -17,7 +17,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/match_scenario', {
+      const response = await fetch('/match_scenario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario })
@@ -52,7 +52,7 @@ function App() {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/create_quiz', {
+      const response = await fetch('/create_quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...quizConfig, user_name: userName })
@@ -76,7 +76,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/check_answer', {
+      const response = await fetch('/check_answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -114,7 +114,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/submit_quiz', {
+      const response = await fetch('/submit_quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

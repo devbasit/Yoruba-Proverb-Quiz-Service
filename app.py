@@ -234,6 +234,7 @@ def submit_quiz():
     percentage = (score / num_questions * 100) if num_questions > 0 else 0
     grade = get_grade(percentage)
     
+    # Ensure the file is saved in the root directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"quiz_results_{user_name}_{timestamp}.csv"
     with open(filename, 'w', encoding='utf-8', newline='') as csvfile:
@@ -266,7 +267,7 @@ def submit_quiz():
             } for qtype, stats in type_counts.items() if stats['total'] > 0
         },
         'results': results,
-        'results_file': filename
+        'results_file': filename  # Ensure this matches the filename used
     })
 
 @app.route('/download/<filename>', methods=['GET'])

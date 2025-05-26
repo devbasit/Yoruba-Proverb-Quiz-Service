@@ -81,7 +81,7 @@ function App() {
             setError(null);
             _context.prev = 2;
             _context.next = 5;
-            return fetch('http://localhost:5000/match_scenario', {
+            return fetch('/match_scenario', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -145,7 +145,7 @@ function App() {
           case 6:
             _context2.prev = 6;
             _context2.next = 9;
-            return fetch('http://localhost:5000/create_quiz', {
+            return fetch('/create_quiz', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -196,7 +196,7 @@ function App() {
             setError(null);
             _context3.prev = 2;
             _context3.next = 5;
-            return fetch('http://localhost:5000/check_answer', {
+            return fetch('/check_answer', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -263,7 +263,7 @@ function App() {
             setError(null);
             _context4.prev = 2;
             _context4.next = 5;
-            return fetch('http://localhost:5000/submit_quiz', {
+            return fetch('/submit_quiz', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
