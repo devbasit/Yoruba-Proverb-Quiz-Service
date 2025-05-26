@@ -21,7 +21,7 @@ def initialize_gemini():
     Initialize the Google Gemini API by reading the API key from a text file.
     """
     try:
-        api_key = os.getenv('GEMINI_API_KEY')
+        api_key = os.getenv('GOOGLE_API_KEY')
         genai.configure(api_key=api_key)
     except FileNotFoundError:
         raise Exception("gemini_api_key.txt not found. Please create it with your API key.")
