@@ -1,0 +1,4 @@
+Question ID,Type,Correct,Selected Answer,Correct Answer,Feedback
+0,scenario_to_proverb,True,"The factory floor was swamped with returns due to faulty wiring. Instead of just fixing the returned items, the supervisor tracked the defects back to a miscalibrated machine; once repaired, the returns stopped completely.","The factory floor was swamped with returns due to faulty wiring. Instead of just fixing the returned items, the supervisor tracked the defects back to a miscalibrated machine; once repaired, the returns stopped completely.",Correct! This context matches the proverb.
+,,,,Final Score,1/1 (100.0%)
+,,,,Grade,A
