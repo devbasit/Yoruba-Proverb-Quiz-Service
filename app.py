@@ -137,8 +137,8 @@ def create_quiz():
     quiz_type = data.get('quiz_type')
     user_name = data.get('user_name', 'Anonymous')
     
-    if not isinstance(num_questions, int) or num_questions < 1 or num_questions > 50:
-        return jsonify({'error': 'Number of questions must be between 1 and 50'}), 400
+    if not isinstance(num_questions, int) or num_questions < 1 or num_questions > 10:
+        return jsonify({'error': 'Number of questions must be between 1 and 10'}), 400
     
     try:
         quiz_type = QuizType(quiz_type.lower())

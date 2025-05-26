@@ -196,14 +196,14 @@ const handleSubmitQuiz = async (answersToSubmit) => {
               />
             </div>
             <div className="mb-5">
-              <label className="block mb-2 text-green-700">Number of Questions (1-50):</label>
+              <label className="block mb-2 text-green-700">Number of Questions (1-10):</label>
               <input
                 type="number"
                 className="w-full p-3 border-2 border-green-500 rounded-lg focus:outline-none focus:border-yellow-500"
                 value={quizConfig.num_questions}
                 onChange={(e) => setQuizConfig({ ...quizConfig, num_questions: parseInt(e.target.value) || 1 })}
                 min="1"
-                max="50"
+                max="10"
               />
             </div>
             <div className="mb-5">
@@ -221,7 +221,7 @@ const handleSubmitQuiz = async (answersToSubmit) => {
             <button
               className="w-full bg-yellow-500 text-gray-800 p-3 rounded-lg hover:bg-yellow-600 disabled:bg-gray-400 transition duration-300"
               onClick={handleCreateQuiz}
-              disabled={loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 50 || !userName.trim()}
+              disabled={loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 10 || !userName.trim()}
             >
               {loading ? 'Loading...' : 'Start Quiz'}
             </button>

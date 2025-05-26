@@ -378,7 +378,7 @@ function App() {
     className: "mb-5"
   }, /*#__PURE__*/React.createElement("label", {
     className: "block mb-2 text-green-700"
-  }, "Number of Questions (1-50):"), /*#__PURE__*/React.createElement("input", {
+  }, "Number of Questions (1-10):"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     className: "w-full p-3 border-2 border-green-500 rounded-lg focus:outline-none focus:border-yellow-500",
     value: quizConfig.num_questions,
@@ -388,7 +388,7 @@ function App() {
       }));
     },
     min: "1",
-    max: "50"
+    max: "10"
   })), /*#__PURE__*/React.createElement("div", {
     className: "mb-5"
   }, /*#__PURE__*/React.createElement("label", {
@@ -410,7 +410,7 @@ function App() {
   }, "Scenario to Proverb"))), /*#__PURE__*/React.createElement("button", {
     className: "w-full bg-yellow-500 text-gray-800 p-3 rounded-lg hover:bg-yellow-600 disabled:bg-gray-400 transition duration-300",
     onClick: handleCreateQuiz,
-    disabled: loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 50 || !userName.trim()
+    disabled: loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 10 || !userName.trim()
   }, loading ? 'Loading...' : 'Start Quiz')), error && /*#__PURE__*/React.createElement("p", {
     className: "text-red-500 mt-5"
   }, error)), view === 'match' && matchedProverb && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {

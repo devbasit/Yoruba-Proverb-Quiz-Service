@@ -6,6 +6,7 @@ from enum import Enum
 from datetime import datetime
 import google.generativeai as genai
 import json
+import os
 # Ensure the Google Gemini API is configured correctly
 
 # Quiz type enumeration
@@ -20,8 +21,7 @@ def initialize_gemini():
     Initialize the Google Gemini API by reading the API key from a text file.
     """
     try:
-        with open('gemini_api_key.txt', 'r') as file:
-            api_key = file.read().strip()
+        api_key = os.getenv('GEMINI_API_KEY')
         genai.configure(api_key=api_key)
     except FileNotFoundError:
         raise Exception("gemini_api_key.txt not found. Please create it with your API key.")
