@@ -362,7 +362,7 @@ function App() {
     disabled: loading || !scenario.trim()
   }, loading ? 'Loading...' : 'Find Proverb')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
     className: "text-2xl font-semibold mb-3 text-yellow-600"
-  }, "Create a Quiz"), /*#__PURE__*/React.createElement("div", {
+  }, "Take a Quiz"), /*#__PURE__*/React.createElement("div", {
     className: "mb-5"
   }, /*#__PURE__*/React.createElement("label", {
     className: "block mb-2 text-green-700"
