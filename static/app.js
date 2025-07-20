@@ -106,7 +106,7 @@ function App() {
               setMatchedProverb(data);
               setView('match');
             } else {
-              setError(((_data = data) === null || _data === void 0 ? void 0 : _data.error) || 'No data returned from server');
+              setError(((_data = data) === null || _data === void 0 ? void 0 : _data.error) || 'No data returned from server. Please try again.');
             }
             _context.next = 17;
             break;
@@ -255,7 +255,7 @@ function App() {
   }();
   var handleSubmitQuiz = /*#__PURE__*/function () {
     var _ref4 = _asyncToGenerator(/*#__PURE__*/_regeneratorRuntime().mark(function _callee4(answersToSubmit) {
-      var response, errorData, data, csvContent, filename, blob, url, link;
+      var response, errorData, data;
       return _regeneratorRuntime().wrap(function _callee4$(_context4) {
         while (1) switch (_context4.prev = _context4.next) {
           case 0:
@@ -298,40 +298,46 @@ function App() {
             setResults(data);
             setView('results');
 
-            // Create a downloadable file from csv_content
-            csvContent = data.csv_content;
-            filename = data.results_file;
-            blob = new Blob([csvContent], {
-              type: 'text/csv;charset=utf-8;'
-            });
-            url = URL.createObjectURL(blob);
-            link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', filename);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            _context4.next = 32;
+            // REMOVE automatic download code from here!
+            // Download will now be triggered by button click in results view.
+            _context4.next = 21;
             break;
-          case 29:
-            _context4.prev = 29;
+          case 18:
+            _context4.prev = 18;
             _context4.t0 = _context4["catch"](2);
             setError(_context4.t0.message);
-          case 32:
-            _context4.prev = 32;
+          case 21:
+            _context4.prev = 21;
             setLoading(false);
-            return _context4.finish(32);
-          case 35:
+            return _context4.finish(21);
+          case 24:
           case "end":
             return _context4.stop();
         }
-      }, _callee4, null, [[2, 29, 32, 35]]);
+      }, _callee4, null, [[2, 18, 21, 24]]);
     }));
     return function handleSubmitQuiz(_x2) {
       return _ref4.apply(this, arguments);
     };
   }();
+
+  // Add this new function for manual download:
+  var handleDownloadResults = function handleDownloadResults() {
+    if (!results) return;
+    var csvContent = results.csv_content;
+    var filename = results.results_file;
+    var blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;'
+    });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
   var resetQuiz = function resetQuiz() {
     setQuiz(null);
     setCurrentQuestionIndex(0);
@@ -362,7 +368,7 @@ function App() {
     disabled: loading || !scenario.trim()
   }, loading ? 'Loading...' : 'Find Proverb')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
     className: "text-2xl font-semibold mb-3 text-yellow-600"
-  }, "Take a Quiz"), /*#__PURE__*/React.createElement("div", {
+  }, "Create a Quiz"), /*#__PURE__*/React.createElement("div", {
     className: "mb-5"
   }, /*#__PURE__*/React.createElement("label", {
     className: "block mb-2 text-green-700"
@@ -378,7 +384,7 @@ function App() {
     className: "mb-5"
   }, /*#__PURE__*/React.createElement("label", {
     className: "block mb-2 text-green-700"
-  }, "Number of Questions (1-10):"), /*#__PURE__*/React.createElement("input", {
+  }, "Number of Questions (1-20):"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     className: "w-full p-3 border-2 border-green-500 rounded-lg focus:outline-none focus:border-yellow-500",
     value: quizConfig.num_questions,
@@ -388,7 +394,7 @@ function App() {
       }));
     },
     min: "1",
-    max: "10"
+    max: "20"
   })), /*#__PURE__*/React.createElement("div", {
     className: "mb-5"
   }, /*#__PURE__*/React.createElement("label", {
@@ -410,7 +416,7 @@ function App() {
   }, "Scenario to Proverb"))), /*#__PURE__*/React.createElement("button", {
     className: "w-full bg-yellow-500 text-gray-800 p-3 rounded-lg hover:bg-yellow-600 disabled:bg-gray-400 transition duration-300",
     onClick: handleCreateQuiz,
-    disabled: loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 10 || !userName.trim()
+    disabled: loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 20 || !userName.trim()
   }, loading ? 'Loading...' : 'Start Quiz')), error && /*#__PURE__*/React.createElement("p", {
     className: "text-red-500 mt-5"
   }, error)), view === 'match' && matchedProverb && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
@@ -423,15 +429,11 @@ function App() {
     className: "mb-3"
   }, /*#__PURE__*/React.createElement("strong", {
     className: "text-green-700"
-  }, "Proverb:"), " ", matchedProverb.proverb || 'N/A'), /*#__PURE__*/React.createElement("p", {
-    className: "mb-3"
-  }, /*#__PURE__*/React.createElement("strong", {
-    className: "text-green-700"
-  }, "Translation:"), " ", matchedProverb.translation || 'N/A'), /*#__PURE__*/React.createElement("p", {
-    className: "mb-3"
-  }, /*#__PURE__*/React.createElement("strong", {
-    className: "text-green-700"
-  }, "Wisdom:"), " ", matchedProverb.wisdom || 'N/A'), /*#__PURE__*/React.createElement("button", {
+  }, "Scenario Query Response ", /*#__PURE__*/React.createElement("br", null))), /*#__PURE__*/React.createElement("div", {
+    dangerouslySetInnerHTML: {
+      __html: matchedProverb.response || 'N/A'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
     className: "mt-5 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition duration-300",
     onClick: function onClick() {
       return setView('home');
@@ -517,10 +519,9 @@ function App() {
     className: "mb-3"
   }, /*#__PURE__*/React.createElement("strong", {
     className: "text-green-700"
-  }, "Results saved to:"), " ", results.results_file), /*#__PURE__*/React.createElement("a", {
-    href: "/download/".concat(results.results_file),
+  }, "Results saved to:"), " ", results.results_file), /*#__PURE__*/React.createElement("button", {
     className: "mt-5 w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 text-center block",
-    download: true
+    onClick: handleDownloadResults
   }, "Download Results"), /*#__PURE__*/React.createElement("button", {
     className: "mt-5 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition duration-300",
     onClick: resetQuiz

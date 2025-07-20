@@ -1,16 +1,52 @@
 from flask import Flask, request, jsonify, render_template, send_file
 from flask_cors import CORS
-from yoruba_proverb_quiz_service import parse_proverbs, generate_quiz, check_answer, QuizType, get_grade, call_llm
+from yoruba_proverb_quiz_service import generate_quiz, check_answer, QuizType, get_grade
 import uuid
-import random
 import csv
-import json
 from typing import List, Dict
 from datetime import datetime
 import sys
 import io
+import pandas as pd
 import logging
 import os
+import csv
+from io import StringIO
+from datetime import datetime
+import markdown
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.prompts import PromptTemplate
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+from langchain_chroma import Chroma
+import os
+
+
+# Load the models
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
+base_dir = "."
+persist_directory = os.path.join(base_dir, "chroma_db")
+vectordb = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+retriever = vectordb.as_retriever(search_kwargs={"k": 5})
+
+#Create the retrieval chain
+template="""
+You are a wise Yoruba cultural assistant. You are given a collection of Yoruba proverbs with translations and explanations.
+
+Use the following context to answer the user's question:
+{context}
+Ensure there's at least two proverbs in your response even if it's not completely relevant.
+Now, answer this question clearly, respectfully and as concise as possible with a mixture of both Yoruba and English texts:
+{input}
+"""
+
+prompt = PromptTemplate.from_template(template)
+combine_docs_chain = create_stuff_documents_chain(llm, prompt)
+retrieval_chain = create_retrieval_chain(retriever, combine_docs_chain)
 
 # Ensure UTF-8 output for terminal
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -22,101 +58,24 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for API routes
 app.config['JSON_AS_ASCII'] = False  # Prevent Unicode escaping in JSON responses
-proverbs = parse_proverbs('extracted_div_texts_modded.txt')
+
+df = pd.read_csv("./processed_data.csv")
+proverbs = df['proverb'].unique().tolist()
+used_proverb_to_scenario_pairs = set()
+used_scenario_to_proverb_pairs = set()
+
+
 quiz_storage = {}
 
-def match_proverb_to_scenario(scenario: str, proverbs: List[Dict[str, str]]) -> Dict[str, str]:
+def match_proverb_to_scenario(scenario: str) -> str:
     """
     Match a user-provided scenario to the most relevant proverb based on wisdom.
     """
-    # Revised prompt to return only JSON
-    prompt = f"""
-    You are an expert in Yoruba proverbs and their meanings. Your task is to match a user-provided scenario to the most relevant Yoruba proverb based on its wisdom.
+    #Invoke the retrieval chain
+    response=retrieval_chain.invoke({"input":scenario})
 
-    Scenario: "{scenario}"
-
-    Below is a list of Yoruba proverbs with their wisdom:
-    {json.dumps([{ 'proverb': p['proverb'], 'wisdom': p['wisdom'], 'translation': p.get('translation', 'N/A')} for p in proverbs], indent=2, ensure_ascii=False)}
-
-    Steps:
-    1. Analyze the scenario and identify its core theme or lesson (e.g., generosity, betrayal, caution).
-    2. Compare the scenario's theme to the wisdom of each proverb.
-    3. Select the proverb whose wisdom most closely aligns with the scenario's lesson.
-    4. Return ONLY the JSON object with the fields: 'proverb', 'translation', and 'wisdom'. Do not include any explanatory text, comments, or additional formatting.
-
-    Example output:
-    {{"proverb": "sample proverb", "translation": "sample translation", "wisdom": "sample wisdom"}}
-    """
-    logger.info(f"Calling LLM with scenario: {scenario}")
-    llm_response = call_llm(prompt)
-    logger.info(f"LLM response: {llm_response}")
-
-    # Clean the LLM response by removing Markdown formatting and extra text
-    cleaned_response = llm_response.strip()
-    if cleaned_response.startswith('```json'):
-        cleaned_response = cleaned_response[len('```json'):].lstrip()
-    if cleaned_response.endswith('```'):
-        cleaned_response = cleaned_response[:-len('```')].rstrip()
-    # Remove any leading/trailing text before and after JSON
-    start_idx = cleaned_response.find('{')
-    end_idx = cleaned_response.rfind('}') + 1
-    if start_idx != -1 and end_idx != -1:
-        cleaned_response = cleaned_response[start_idx:end_idx]
-
-    try:
-        result = json.loads(cleaned_response)
-        llm_proverb = result.get('proverb', '').strip().strip('"')  # Normalize: strip quotes and whitespace
-        logger.info(f"LLM selected proverb: {llm_proverb}")
-        for proverb in proverbs:
-            db_proverb = proverb['proverb'].strip()  # Normalize database proverb
-            logger.debug(f"Comparing LLM proverb '{llm_proverb}' with database proverb '{db_proverb}'")
-            if llm_proverb == db_proverb:
-                logger.info(f"Matched proverb via LLM: {proverb['proverb']}")
-                return {
-                    'proverb': proverb['proverb'],
-                    'translation': proverb.get('translation', 'N/A'),
-                    'wisdom': proverb['wisdom']
-                }
-        # If no match is found, return the LLM's proverb with its translation and wisdom
-        logger.warning(f"No exact match found for LLM proverb '{llm_proverb}' in database")
-        return {
-            'proverb': llm_proverb,
-            'translation': result.get('translation', 'N/A'),
-            'wisdom': result.get('wisdom', 'N/A')
-        }
-    except json.JSONDecodeError as e:
-        logger.error(f"LLM response JSON parsing failed: {e}, cleaned response: {cleaned_response}")
-        # Fallback to keyword matching with weighted scoring
-        scenario_words = scenario.lower().split()
-        best_match = None
-        best_score = 0
-
-        for proverb in proverbs:
-            wisdom = proverb['wisdom'].lower()
-            # Count how many scenario words appear in the wisdom
-            matches = sum(1 for word in scenario_words if word in wisdom)
-            # Add a small bonus for longer matches to prioritize more specific wisdom
-            score = matches + (len(wisdom.split()) * 0.1)
-            if score > best_score:
-                best_score = score
-                best_match = proverb
-
-        if best_match:
-            logger.info(f"Fallback matched proverb: {best_match['proverb']} with score: {best_score}")
-            return {
-                'proverb': best_match['proverb'],
-                'translation': best_match.get('translation', 'N/A'),
-                'wisdom': best_match['wisdom']
-            }
-        else:
-            # Last resort: random choice (avoid repeated selection by shuffling)
-            selected_proverb = random.choice(proverbs)
-            logger.info(f"No keyword match found, randomly selected: {selected_proverb['proverb']}")
-            return {
-                'proverb': selected_proverb['proverb'],
-                'translation': selected_proverb.get('translation', 'N/A'),
-                'wisdom': selected_proverb['wisdom']
-            }
+    #Print the answer to the question
+    return({"response":markdown.markdown(response["answer"])})
 
 @app.route('/match_scenario', methods=['POST'])
 def match_scenario():
@@ -124,10 +83,8 @@ def match_scenario():
     scenario = data.get('scenario')
     if not scenario:
         return jsonify({'error': 'Scenario is required'}), 400
-    result = match_proverb_to_scenario(scenario, proverbs)
-    logger.info(f"Before jsonify - Response: {result}")
+    result = match_proverb_to_scenario(scenario)
     response = jsonify(result or {'error': 'No proverb matched'})
-    logger.info(f"After jsonify - Response data: {response.get_data(as_text=True)}")
     return response
 
 @app.route('/create_quiz', methods=['POST'])
@@ -137,15 +94,15 @@ def create_quiz():
     quiz_type = data.get('quiz_type')
     user_name = data.get('user_name', 'Anonymous')
     
-    if not isinstance(num_questions, int) or num_questions < 1 or num_questions > 10:
-        return jsonify({'error': 'Number of questions must be between 1 and 10'}), 400
+    if not isinstance(num_questions, int) or num_questions < 1 or num_questions > 20:
+        return jsonify({'error': 'Number of questions must be between 1 and 20'}), 400
     
     try:
         quiz_type = QuizType(quiz_type.lower())
     except ValueError:
         return jsonify({'error': 'Invalid quiz type. Use "proverb_to_scenario", "scenario_to_proverb", or "mixture"'}), 400
     
-    quiz = generate_quiz(proverbs, num_questions, quiz_type)
+    quiz = generate_quiz(df, num_questions, quiz_type)
     quiz_id = str(uuid.uuid4())
     quiz_storage[quiz_id] = quiz
     
@@ -191,11 +148,6 @@ def check_answer_endpoint():
         'selected': result['selected'],
         'correct_answer': result['correct_answer']
     })
-
-from flask import Response
-import csv
-from io import StringIO
-from datetime import datetime
 
 @app.route('/submit_quiz', methods=['POST'])
 def submit_quiz():
@@ -277,22 +229,6 @@ def submit_quiz():
         'results': results,
         'results_file': filename,
         'csv_content': csv_content  # Add CSV content to the response
-    })
-    
-    return jsonify({
-        'score': score,
-        'total': num_questions,
-        'percentage': percentage,
-        'grade': grade,
-        'breakdown': {
-            qtype: {
-                'correct': stats['correct'],
-                'total': stats['total'],
-                'percentage': (stats['correct'] / stats['total'] * 100) if stats['total'] > 0 else 0
-            } for qtype, stats in type_counts.items() if stats['total'] > 0
-        },
-        'results': results,
-        'results_file': filename  # Ensure this matches the filename used
     })
 
 @app.route('/download/<filename>', methods=['GET'])

@@ -34,7 +34,7 @@ function App() {
         setMatchedProverb(data);
         setView('match');
       } else {
-        setError(data?.error || 'No data returned from server');
+        setError(data?.error || 'No data returned from server. Please try again.');
       }
     } catch (err) {
       console.error('Error in handleMatchScenario:', err);
@@ -133,23 +133,29 @@ const handleSubmitQuiz = async (answersToSubmit) => {
     setResults(data);
     setView('results');
 
-    // Create a downloadable file from csv_content
-    const csvContent = data.csv_content;
-    const filename = data.results_file;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // REMOVE automatic download code from here!
+    // Download will now be triggered by button click in results view.
   } catch (err) {
     setError(err.message);
   } finally {
     setLoading(false);
   }
+};
+
+// Add this new function for manual download:
+const handleDownloadResults = () => {
+  if (!results) return;
+  const csvContent = results.csv_content;
+  const filename = results.results_file;
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
 
   const resetQuiz = () => {
@@ -196,14 +202,14 @@ const handleSubmitQuiz = async (answersToSubmit) => {
               />
             </div>
             <div className="mb-5">
-              <label className="block mb-2 text-green-700">Number of Questions (1-10):</label>
+              <label className="block mb-2 text-green-700">Number of Questions (1-20):</label>
               <input
                 type="number"
                 className="w-full p-3 border-2 border-green-500 rounded-lg focus:outline-none focus:border-yellow-500"
                 value={quizConfig.num_questions}
                 onChange={(e) => setQuizConfig({ ...quizConfig, num_questions: parseInt(e.target.value) || 1 })}
                 min="1"
-                max="10"
+                max="20"
               />
             </div>
             <div className="mb-5">
@@ -221,7 +227,7 @@ const handleSubmitQuiz = async (answersToSubmit) => {
             <button
               className="w-full bg-yellow-500 text-gray-800 p-3 rounded-lg hover:bg-yellow-600 disabled:bg-gray-400 transition duration-300"
               onClick={handleCreateQuiz}
-              disabled={loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 10 || !userName.trim()}
+              disabled={loading || quizConfig.num_questions < 1 || quizConfig.num_questions > 20 || !userName.trim()}
             >
               {loading ? 'Loading...' : 'Start Quiz'}
             </button>
@@ -234,9 +240,11 @@ const handleSubmitQuiz = async (answersToSubmit) => {
         <div>
           <h2 className="text-3xl font-bold mb-5 text-yellow-600">Matched Proverb</h2>
           <p className="mb-3"><strong className="text-green-700">Scenario:</strong> {scenario}</p>
-          <p className="mb-3"><strong className="text-green-700">Proverb:</strong> {matchedProverb.proverb || 'N/A'}</p>
+          {/* <p className="mb-3"><strong className="text-green-700">Proverb:</strong> {matchedProverb.proverb || 'N/A'}</p>
           <p className="mb-3"><strong className="text-green-700">Translation:</strong> {matchedProverb.translation || 'N/A'}</p>
-          <p className="mb-3"><strong className="text-green-700">Wisdom:</strong> {matchedProverb.wisdom || 'N/A'}</p>
+          <p className="mb-3"><strong className="text-green-700">Wisdom:</strong> {matchedProverb.wisdom || 'N/A'}</p> */}
+          <p className="mb-3"><strong className="text-green-700">Scenario Query Response <br /></strong></p>
+          <div dangerouslySetInnerHTML={{ __html: matchedProverb.response || 'N/A' }} />
           <button
             className="mt-5 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition duration-300"
             onClick={() => setView('home')}
@@ -317,13 +325,12 @@ const handleSubmitQuiz = async (answersToSubmit) => {
             </div>
           ))}
           <p className="mb-3"><strong className="text-green-700">Results saved to:</strong> {results.results_file}</p>
-          <a
-            href={`/download/${results.results_file}`}
+          <button
             className="mt-5 w-full bg-green-600 text-white p-3 rounded-lg hover:bg-green-700 text-center block"
-            download
+            onClick={handleDownloadResults}
           >
             Download Results
-          </a>
+          </button>
           <button
             className="mt-5 w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition duration-300"
             onClick={resetQuiz}

@@ -1,173 +1,39 @@
 import random
-import re
 import csv
 from typing import List, Dict
 from enum import Enum
 from datetime import datetime
-import google.generativeai as genai
-import json
-import os
-# Ensure the Google Gemini API is configured correctly
+import pandas as pd
 
+# Ensure the Google Gemini API is configured correctly
+df = pd.read_csv("./processed_data.csv")
 # Quiz type enumeration
 class QuizType(Enum):
     PROVERB_TO_SCENARIO = "proverb_to_scenario"
     SCENARIO_TO_PROVERB = "scenario_to_proverb"
     MIXTURE = "mixture"
 
-# Initialize Gemini API
-def initialize_gemini():
-    """
-    Initialize the Google Gemini API by reading the API key from a text file.
-    """
-    try:
-        api_key = os.getenv('GOOGLE_API_KEY')
-        genai.configure(api_key=api_key)
-    except FileNotFoundError:
-        raise Exception("gemini_api_key.txt not found. Please create it with your API key.")
-    except Exception as e:
-        raise Exception(f"Failed to initialize Gemini API: {str(e)}")
 
-# Global model initialization
+def generate_proverb_to_scenario_question(df):
+    """
+    Generates a proverb-to-scenario quiz question.
 
-model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            generation_config={
-                "temperature": 0.9,
-                "top_p": 1,
-                "top_k": 1,
-                "max_output_tokens": 500
-            }
-        )
+    Args:
+        df: pandas DataFrame with 'proverb', 'translation', and 'scenario' columns.
 
-def call_llm(prompt: str) -> str:
+    Returns:
+        A dictionary containing the quiz question details.
     """
-    Generate text using Google Gemini API for the given prompt.
-    """
-    global model
-    if model is None:
-        initialize_gemini()
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro",
-            generation_config={
-                "temperature": 0.9,
-                "top_p": 1,
-                "top_k": 1,
-                "max_output_tokens": 100
-            }
-        )
-    
-    instruction = (
-        f"Given the following wisdom, generate a brief scenario (2-3 sentences) that reflects its context. "
-        f"Be sure to consider cultural nuances and the essence of the wisdom."
-        f"Yoruba names should be given more priority over other names."
-        f"Ensure the scenario is clear, concise, and culturally neutral unless specified. "
-        f"Wisdom: {prompt}\nScenario:"
-    )
-    
-    try:
-        response = model.generate_content(instruction)
-        scenario = response.text.strip()
-        if scenario.startswith("Scenario:"):
-            scenario = scenario[len("Scenario:"):].strip()
-        return scenario
-    except Exception as e:
-        print(f"Error calling Gemini API: {str(e)}")
-        return "Failed to generate scenario due to API error."
-    
-def call_llm_sc_to_pro(prompt: str) -> str:
-    """
-    Generate text using Google Gemini API for the given prompt.
-    """
-    global model
-    if model is None:
-        initialize_gemini()
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro",
-            generation_config={
-                "temperature": 0.9,
-                "top_p": 1,
-                "top_k": 1,
-                "max_output_tokens": 100
-            }
-        )
-    
-    instruction = (
-        prompt
-    )
-    
-    try:
-        response = model.generate_content(instruction)
-        scenario = response.text.strip()
-        if scenario.startswith("Scenario:"):
-            scenario = scenario[len("Scenario:"):].strip()
-        return scenario
-    except Exception as e:
-        print(f"Error calling Gemini API: {str(e)}")
-        return "Failed to generate scenario due to API error."
+    # Select a random row to get the correct proverb and scenario
+    selected_row = df.sample(n=1).iloc[0]
+    selected_proverb = {'proverb': selected_row['proverb'], 'translation': selected_row['translation'], 'wisdom': selected_row['wisdom']}
+    context = selected_row['scenario']
 
-def parse_proverbs(file_path: str) -> List[Dict[str, str]]:
-    """
-    Parse the proverb file into a list of dictionaries with proverb, translation, and wisdom.
-    """
-    proverbs = []
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read().splitlines()
-    
-    for line in content:
-        if not line.strip():
-            continue
-        match = re.match(r'^(.*?)\.?Translation:(.*?)\.?Wisdom:(.*)$', line.strip())
-        if match:
-            proverb, translation, wisdom = match.groups()
-            proverbs.append({
-                'proverb': proverb.strip(),
-                'translation': translation.strip(),
-                'wisdom': wisdom.strip()
-            })
-        else:
-            print(f"Skipping malformed line: {line[:50]}...")
-    
-    return proverbs
+    # Select 3 other random proverbs with their translations
+    other_proverbs_rows = df[df['proverb'] != selected_proverb['proverb']].sample(n=3)
+    other_proverbs = [{'proverb': row['proverb'], 'translation': row['translation']} for index, row in other_proverbs_rows.iterrows()]
 
-def match_proverb_to_scenario(scenario: str, proverbs: List[Dict[str, str]]) -> Dict[str, str]:
-    """
-    Match a user-provided scenario to the most relevant proverb based on wisdom.
-    """
-    prompt = f"""
-    Given the following scenario: "{scenario}"
-    And a list of Yoruba proverbs with their wisdom:
-    {json.dumps([{ 'proverb': p['proverb'], 'wisdom': p['wisdom'] } for p in proverbs], indent=2)}
-    
-    Identify the proverb whose wisdom best matches the context of the scenario.
-    Return the just the proverb, its translation, and wisdom in JSON format.
-    """
-    llm_response = call_llm_sc_to_pro(prompt)
-    # Parse LLM response (assuming it returns JSON)
-    try:
-        result = json.loads(llm_response)
-        # Find the matching proverb
-        for proverb in proverbs:
-            if proverb['proverb'] == result.get('proverb'):
-                return proverb
-    except json.JSONDecodeError:
-        # Fallback: Simple keyword matching if LLM fails
-        for proverb in proverbs:
-            if any(word.lower() in proverb['wisdom'].lower() for word in scenario.lower().split()):
-                return proverb
-    return random.choice(proverbs)  # Fallback to random if no match
-
-def generate_proverb_to_scenario_question(proverbs: List[Dict[str, str]]) -> Dict:
-    """
-    Generate a question where the user chooses the correct proverb for a given scenario.
-    """
-    selected_proverb = random.choice(proverbs)
-    wisdom = selected_proverb['wisdom']
-    
-    prompt = f"{wisdom}"
-    context = call_llm(prompt).strip()
-    
-    other_proverbs = random.sample([p for p in proverbs if p['proverb'] != selected_proverb['proverb']], 3)
+    # Create options for the quiz
     options = [
         {'proverb': selected_proverb['proverb'], 'translation': selected_proverb['translation'], 'is_correct': True},
         {'proverb': other_proverbs[0]['proverb'], 'translation': other_proverbs[0]['translation'], 'is_correct': False},
@@ -176,6 +42,7 @@ def generate_proverb_to_scenario_question(proverbs: List[Dict[str, str]]) -> Dic
     ]
     random.shuffle(options)
     
+
     return {
         'type': QuizType.PROVERB_TO_SCENARIO.value,
         'context': context,
@@ -183,38 +50,41 @@ def generate_proverb_to_scenario_question(proverbs: List[Dict[str, str]]) -> Dic
         'correct_proverb': selected_proverb
     }
 
-def generate_scenario_to_proverb_question(proverbs: List[Dict[str, str]]) -> Dict:
+def generate_scenario_to_proverb_question(df):
     """
-    Generate a question where the user chooses the correct scenario for a given proverb.
+    Generates a scenario-to-proverb quiz question.
+
+    Args:
+        df: pandas DataFrame with 'proverb', 'translation', and 'scenario' columns.
+
+    Returns:
+        A dictionary containing the quiz question details.
     """
-    selected_proverb = random.choice(proverbs)
-    wisdom = selected_proverb['wisdom']
-    
-    prompt = f"{wisdom}"
-    correct_context = call_llm(prompt).strip()
-    
-    other_proverbs = random.sample([p for p in proverbs if p['proverb'] != selected_proverb['proverb']], 3)
-    incorrect_contexts = []
-    for other in other_proverbs:
-        prompt_incorrect = f"{other['wisdom']}"
-        incorrect_contexts.append(call_llm(prompt_incorrect).strip())
-    
+    # Select a random row to get the correct proverb and scenario
+    selected_row = df.sample(n=1).iloc[0]
+    selected_proverb = {'proverb': selected_row['proverb'], 'translation': selected_row['translation'], 'wisdom': selected_row['wisdom']}
+    context = selected_row['scenario']
+
+    # Select 3 other random scenarios
+    other_scenarios_rows = df[df['scenario'] != selected_row['scenario']].sample(n=3)
+    other_scenarios = [row['scenario'] for index, row in other_scenarios_rows.iterrows()]
+
+    # Create options for the quiz
     options = [
-        {'context': correct_context, 'is_correct': True},
-        {'context': incorrect_contexts[0], 'is_correct': False},
-        {'context': incorrect_contexts[1], 'is_correct': False},
-        {'context': incorrect_contexts[2], 'is_correct': False}
+        {'context': selected_row['scenario'], 'is_correct': True},
+        {'context': other_scenarios[0], 'is_correct': False},
+        {'context': other_scenarios[1], 'is_correct': False},
+        {'context': other_scenarios[2], 'is_correct': False}
     ]
     random.shuffle(options)
-    
     return {
         'type': QuizType.SCENARIO_TO_PROVERB.value,
         'proverb': selected_proverb,
         'options': options,
-        'correct_context': correct_context
+        'correct_context': context
     }
 
-def generate_quiz(proverbs: List[Dict[str, str]], num_questions: int, quiz_type: QuizType) -> List[Dict]:
+def generate_quiz(df, num_questions: int, quiz_type: QuizType) -> List[Dict]:
     """
     Generate a quiz with the specified number of questions and quiz type.
     """
@@ -222,15 +92,15 @@ def generate_quiz(proverbs: List[Dict[str, str]], num_questions: int, quiz_type:
     if quiz_type == QuizType.MIXTURE:
         for _ in range(num_questions):
             if random.choice([True, False]):
-                quiz.append(generate_proverb_to_scenario_question(proverbs))
+                quiz.append(generate_proverb_to_scenario_question(df))
             else:
-                quiz.append(generate_scenario_to_proverb_question(proverbs))
+                quiz.append(generate_scenario_to_proverb_question(df))
     elif quiz_type == QuizType.PROVERB_TO_SCENARIO:
         for _ in range(num_questions):
-            quiz.append(generate_proverb_to_scenario_question(proverbs))
+            quiz.append(generate_proverb_to_scenario_question(df))
     else:  # SCENARIO_TO_PROVERB
         for _ in range(num_questions):
-            quiz.append(generate_scenario_to_proverb_question(proverbs))
+            quiz.append(generate_scenario_to_proverb_question(df))
     
     return quiz
 
@@ -302,7 +172,7 @@ def save_quiz_results(results: List[Dict], score: int, num_questions: int, filen
         writer.writerow(['', '', '', '', 'Final Score', f'{score}/{num_questions} ({percentage:.1f}%)'])
         writer.writerow(['', '', '', '', 'Grade', get_grade(percentage)])
 
-def run_quiz(proverbs: List[Dict[str, str]]):
+def run_quiz():
     """
     Run a customizable quiz with enhanced grading.
     """
@@ -311,10 +181,10 @@ def run_quiz(proverbs: List[Dict[str, str]]):
     # Get number of questions
     while True:
         try:
-            num_questions = int(input("Enter the number of questions (1-10): "))
-            if 1 <= num_questions <= 10:
+            num_questions = int(input("Enter the number of questions (1-20): "))
+            if 1 <= num_questions <= 20:
                 break
-            print("Please enter a number between 1 and 10.")
+            print("Please enter a number between 1 and 20.")
         except ValueError:
             print("Please enter a valid number.")
     
@@ -334,10 +204,10 @@ def run_quiz(proverbs: List[Dict[str, str]]):
         elif choice == '3':
             quiz_type = QuizType.MIXTURE
             break
-        print("Invalid choice. Please select 1, 2, or 3.")
+        print("Invalid choice. Please select one of 1, 2, or 3.")
     
     # Generate quiz
-    quiz = generate_quiz(proverbs, num_questions, quiz_type)
+    quiz = generate_quiz(df, num_questions, quiz_type)
     
     # Run quiz and track results
     score = 0
@@ -413,7 +283,6 @@ def main():
     Main function to run the proverb quiz service via CLI.
     """
     file_path = 'extracted_div_texts_modded.txt'
-    proverbs = parse_proverbs(file_path)
     
     while True:
         print("\nYoruba Proverb Service")
@@ -422,7 +291,7 @@ def main():
         choice = input("Select an option (1-2): ")
         
         if choice == '1':
-            run_quiz(proverbs)
+            run_quiz()
         elif choice == '2':
             print("Exiting...")
             break
