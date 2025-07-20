@@ -10,19 +10,11 @@ import io
 import pandas as pd
 import logging
 import os
-import csv
 from io import StringIO
-from datetime import datetime
 import markdown
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain.prompts import PromptTemplate
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-import os
-
 
 # Load the models
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
@@ -33,21 +25,6 @@ persist_directory = os.path.join(base_dir, "chroma_db")
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
 retriever = vectordb.as_retriever(search_kwargs={"k": 5})
 
-#Create the retrieval chain
-template="""
-You are a wise Yoruba cultural assistant. You are given a collection of Yoruba proverbs with translations and explanations.
-
-Use the following context to answer the user's question:
-{context}
-Ensure there's at least two proverbs in your response even if it's not completely relevant.
-Now, answer this question clearly, respectfully and as concise as possible with a mixture of both Yoruba and English texts:
-{input}
-"""
-
-prompt = PromptTemplate.from_template(template)
-combine_docs_chain = create_stuff_documents_chain(llm, prompt)
-retrieval_chain = create_retrieval_chain(retriever, combine_docs_chain)
-
 # Ensure UTF-8 output for terminal
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -56,26 +33,33 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for API routes
-app.config['JSON_AS_ASCII'] = False  # Prevent Unicode escaping in JSON responses
+CORS(app)
+app.config['JSON_AS_ASCII'] = False
 
 df = pd.read_csv("./processed_data.csv")
 proverbs = df['proverb'].unique().tolist()
-used_proverb_to_scenario_pairs = set()
-used_scenario_to_proverb_pairs = set()
-
-
 quiz_storage = {}
 
 def match_proverb_to_scenario(scenario: str) -> str:
     """
     Match a user-provided scenario to the most relevant proverb based on wisdom.
     """
-    #Invoke the retrieval chain
-    response=retrieval_chain.invoke({"input":scenario})
+    # Retrieve relevant documents
+    docs = retriever.invoke(scenario)
+    context = "\n".join([doc.page_content for doc in docs])
+    # Simple prompt construction
+    prompt = (
+        "You are a wise Yoruba cultural assistant. "
+        "Given these proverbs and explanations:\n"
+        f"{context}\n"
+        "Answer this scenario as concise as possible with at least two proverbs, mixing Yoruba and English:\n"
+        f"{scenario}"
+    )
+    response = llm.invoke(prompt).content
+    print(f"LLM Response: {response}")
+    print(type(response))
 
-    #Print the answer to the question
-    return({"response":markdown.markdown(response["answer"])})
+    return {"response": markdown.markdown(response)}
 
 @app.route('/match_scenario', methods=['POST'])
 def match_scenario():
@@ -228,7 +212,7 @@ def submit_quiz():
         },
         'results': results,
         'results_file': filename,
-        'csv_content': csv_content  # Add CSV content to the response
+        'csv_content': csv_content
     })
 
 @app.route('/download/<filename>', methods=['GET'])
