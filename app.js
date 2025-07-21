@@ -190,7 +190,7 @@ const handleDownloadResults = () => {
             </button>
           </div>
           <div>
-            <h2 className="text-2xl font-semibold mb-3 text-yellow-600">Create a Quiz</h2>
+            <h2 className="text-2xl font-semibold mb-3 text-yellow-600">Take a Proverb Quiz</h2>
             <div className="mb-5">
               <label className="block mb-2 text-green-700">Your Name:</label>
               <input
