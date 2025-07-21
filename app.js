@@ -67,7 +67,7 @@ function App() {
         setError(data.error || 'Failed to create quiz');
       }
     } catch (err) {
-      setError('Error connecting to the server');
+      setError('Error connecting to the server, Please try again later.');
     }
     setLoading(false);
   };

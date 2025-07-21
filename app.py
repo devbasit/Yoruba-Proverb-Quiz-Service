@@ -12,18 +12,52 @@ import logging
 import os
 from io import StringIO
 import markdown
+import chromadb
+import os
+from chromadb import Documents, EmbeddingFunction, Embeddings
+from google.api_core import retry
+from google import genai
+from google.genai import types
 
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_chroma import Chroma
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Load the models
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+# Define a helper to retry when per-minute quota is reached.
+is_retriable = lambda e: (isinstance(e, genai.errors.APIError) and e.code in {429, 503})
 
+
+class GeminiEmbeddingFunction(EmbeddingFunction):
+    def __init__(self):
+        super().__init__()
+        self.model = "models/embedding-001"
+        self.document_mode = False  # Default to query mode
+
+    @retry.Retry(predicate=is_retriable)
+    def __call__(self, input: Documents) -> Embeddings:
+        if self.document_mode:
+            embedding_task = "retrieval_document"
+        else:
+            embedding_task = "retrieval_query"
+
+        response = client.models.embed_content(
+            model=self.model,
+            contents=input,
+            config=types.EmbedContentConfig(
+                task_type=embedding_task,
+            ),
+        )
+        return [e.values for e in response.embeddings]
+
+import csv
 base_dir = "."
-persist_directory = os.path.join(base_dir, "chroma_db")
-vectordb = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-retriever = vectordb.as_retriever(search_kwargs={"k": 5})
+
+DB_NAME = "yoruba-proverb" 
+persist_directory = os.path.join(base_dir, "proverb-chroma_db")
+
+embed_fn = GeminiEmbeddingFunction()
+embed_fn.document_mode = True
+
+chroma_client = chromadb.PersistentClient(path=persist_directory) # Use PersistentClient
+db = chroma_client.get_or_create_collection(name=DB_NAME, embedding_function=embed_fn)
 
 # Ensure UTF-8 output for terminal
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -44,21 +78,28 @@ def match_proverb_to_scenario(scenario: str) -> str:
     """
     Match a user-provided scenario to the most relevant proverb based on wisdom.
     """
-    # Retrieve relevant documents
-    docs = retriever.invoke(scenario)
-    context = "\n".join([doc.page_content for doc in docs])
-    # Simple prompt construction
-    prompt = (
-        "You are a wise Yoruba cultural assistant. "
-        "Given these proverbs and explanations:\n"
-        f"{context}\n"
-        "Answer this scenario as concise as possible with at least two proverbs, mixing Yoruba and English:\n"
-        f"{scenario}"
-    )
-    response = llm.invoke(prompt).content
-    print(f"LLM Response: {response}")
-    print(type(response))
+    # Switch to query mode when generating embeddings.
+    embed_fn.document_mode = False
 
+    # Search the Chroma DB using the specified query.
+
+    result = db.query(query_texts=[scenario], n_results=5)
+    prompt = (
+        f"""
+        You are a wise Yoruba cultural assistant. You are given a collection of Yoruba proverbs with translations and explanations.
+        Use the following context to reply to the user's entry:
+        {result['documents']}
+        Ensure there's at least two proverbs in your response even if it's not completely relevant.
+        Now, reply this entry clearly, respectfully and as concise as possible with a mixture of both Yoruba and English texts with clear formatting for readability:
+        {scenario}
+"""
+    )
+    response = client.models.generate_content(
+      model="gemini-2.5-flash",
+      contents=prompt
+    )
+    response = response.text
+    
     return {"response": markdown.markdown(response)}
 
 @app.route('/match_scenario', methods=['POST'])
