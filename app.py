@@ -18,6 +18,7 @@ from chromadb import Documents, EmbeddingFunction, Embeddings
 from google.api_core import retry
 from google import genai
 from google.genai import types
+import random
 
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -46,8 +47,9 @@ class GeminiEmbeddingFunction(EmbeddingFunction):
             ),
         )
         return [e.values for e in response.embeddings]
+    
+proverbsdf = pd.read_csv("./All proverbs.csv")
 
-import csv
 base_dir = "."
 
 DB_NAME = "yoruba-proverb" 
@@ -112,6 +114,14 @@ def match_scenario():
     response = jsonify(result or {'error': 'No proverb matched'})
     return response
 
+@app.route('/daily_proverb', methods=['GET'])
+def daily_proverb():
+    row = proverbsdf.sample(1).iloc[0]
+    return jsonify({
+        'proverb': row.get('Proverb', ''),
+        'translation': row.get('Translation', ''),
+        'wisdom': row.get('Wisdom/Explanation', '')
+    })
 @app.route('/create_quiz', methods=['POST'])
 def create_quiz():
     data = request.json

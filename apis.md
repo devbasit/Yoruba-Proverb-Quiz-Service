@@ -165,3 +165,15 @@ If file not found:
 - Renders `index.html` template (HTML page).
 
 ---
+## 7. `/daily_proverb`
+**Method:** `GET`  
+**Parameters:** None
+
+**Response:**
+```json
+{
+  "proverb": "<Yoruba proverb>",
+  "translation": "<English translation>",
+  "wisdom": "<Wisdom/Explanation>"
+}
+If there is an error reading the data, the response may be an empty string
