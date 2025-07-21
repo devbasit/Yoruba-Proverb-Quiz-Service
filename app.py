@@ -70,7 +70,7 @@ app = Flask(__name__)
 CORS(app)
 app.config['JSON_AS_ASCII'] = False
 
-df = pd.read_csv("./processed_data.csv")
+df = pd.read_csv("./processed_proverbs_2-3_scenes.csv")
 proverbs = df['proverb'].unique().tolist()
 quiz_storage = {}
 
