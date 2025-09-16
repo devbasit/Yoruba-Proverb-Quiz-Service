@@ -29,7 +29,7 @@ is_retriable = lambda e: (isinstance(e, genai.errors.APIError) and e.code in {42
 class GeminiEmbeddingFunction(EmbeddingFunction):
     def __init__(self):
         super().__init__()
-        self.model = "models/embedding-001"
+        self.model = "gemini-embedding-001"
         self.document_mode = False  # Default to query mode
 
     @retry.Retry(predicate=is_retriable)
