@@ -4,6 +4,7 @@ pandas
 markdown
 google-genai
 chromadb
-sentence-transformer
+sentence-transformers
 google-api-core
 huggingface_hub 
+
