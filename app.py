@@ -20,6 +20,8 @@ from google import genai
 from google.genai import types
 import random
 from sentence_transformers import SentenceTransformer
+from huggingface_hub import login
+login(token = os.getenv('HF_TOKEN'))
 
 
 base_dir = "."
