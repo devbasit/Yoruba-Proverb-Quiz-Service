@@ -19,73 +19,51 @@ from google.api_core import retry
 from google import genai
 from google.genai import types
 import random
+from sentence_transformers import SentenceTransformer
 
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-
-# Define a helper to retry when per-minute quota is reached.
-is_retriable = lambda e: (isinstance(e, genai.errors.APIError) and e.code in {429, 503})
-
-
-class GeminiEmbeddingFunction(EmbeddingFunction):
-    def __init__(self):
-        super().__init__()
-        self.model = "gemini-embedding-001"
-        self.document_mode = False  # Default to query mode
-
-    @retry.Retry(predicate=is_retriable)
-    def __call__(self, input: Documents) -> Embeddings:
-        if self.document_mode:
-            embedding_task = "retrieval_document"
-        else:
-            embedding_task = "retrieval_query"
-
-        response = client.models.embed_content(
-            model=self.model,
-            contents=input,
-            config=types.EmbedContentConfig(
-                task_type=embedding_task,
-            ),
-        )
-        return [e.values for e in response.embeddings]
-    
-proverbsdf = pd.read_csv("./All proverbs.csv")
 
 base_dir = "."
 
-DB_NAME = "yoruba-proverb" 
+DB_NAME = "yoruba-proverb"
 persist_directory = os.path.join(base_dir, "proverb-chroma_db")
 
-embed_fn = GeminiEmbeddingFunction()
-embed_fn.document_mode = True
+# Initialize Sentence Transformer model
+sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Define a simple embedding function for Sentence Transformers
+class SentenceTransformerEmbeddingFunction(EmbeddingFunction):
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input: Documents) -> Embeddings:
+        return self.model.encode(input).tolist()
+
+
+embed_fn = SentenceTransformerEmbeddingFunction(sentence_model)
+
 
 chroma_client = chromadb.PersistentClient(path=persist_directory) # Use PersistentClient
 db = chroma_client.get_or_create_collection(name=DB_NAME, embedding_function=embed_fn)
 
-# Ensure UTF-8 output for terminal
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)
-app.config['JSON_AS_ASCII'] = False
-
-df = pd.read_csv("./processed_proverbs_2-3_scenes.csv")
-proverbs = df['proverb'].unique().tolist()
-quiz_storage = {}
 
 def match_proverb_to_scenario(scenario: str) -> str:
     """
     Match a user-provided scenario to the most relevant proverb based on wisdom.
     """
     # Switch to query mode when generating embeddings.
-    embed_fn.document_mode = False
+    # For Sentence Transformers, the same model is used for both document and query embedding
+    # so we don't need to change modes here.
 
     # Search the Chroma DB using the specified query.
+    # Embed the query using the Sentence Transformer model
+    query_embedding = sentence_model.encode([scenario]).tolist()[0]
 
-    result = db.query(query_texts=[scenario], n_results=5)
+    result = db.query(query_embeddings=[query_embedding], n_results=5)
     prompt = (
         f"""
         You are a wise Yoruba cultural assistant. You are given a collection of Yoruba proverbs with translations and explanations.
@@ -97,11 +75,11 @@ def match_proverb_to_scenario(scenario: str) -> str:
 """
     )
     response = client.models.generate_content(
-      model="gemini-2.5-flash",
+      model="gemini-2.0-flash",
       contents=prompt
     )
     response = response.text
-    
+
     return {"response": markdown.markdown(response)}
 
 @app.route('/match_scenario', methods=['POST'])
